@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LogSentinel | Project Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scroll-progress" id="scroll-progress"></div>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <nav class="quick-nav">
+    <a href="#pipeline">Pipeline</a>
+    <a href="#concepts">Concepts</a>
+    <a href="#dataset">Dataset</a>
+    <a href="#alerts">Alerts</a>
+    <a href="#run">Run</a>
+  </nav>
+
+  <header class="hero reveal">
+    <p class="eyebrow">Behavioral Intrusion Detection Pipeline</p>
+    <h1>LogSentinel</h1>
+    <p class="lead">
+      End-to-end network behavior monitoring from flow CSV ingestion to SOC-ready anomaly alerts.
+      This project uses a static dataset and batch pipeline execution for reproducible analysis.
+    </p>
+    <div class="hero-actions">
+      <a class="btn outline" href="#pipeline">View Pipeline</a>
+    </div>
+    <div class="hero-stats">
+      <div><span>Window Size</span><strong>10,000 flows</strong></div>
+      <div><span>Baseline Source</span><strong>Monday profile</strong></div>
+      <div><span>Detection Core</span><strong>Z-score + Anomaly Index</strong></div>
+    </div>
+  </header>
+
+  <main>
+    <section id="pipeline" class="card reveal">
+      <h2>Pipeline Flow (Improved)</h2>
+      <p class="section-note">The pipeline is sequential and each stage writes artifacts for the next stage.</p>
+
+      <div class="timeline">
+        <article class="stage">
+          <div class="badge">1</div>
+          <h3>Preprocess</h3>
+          <p>Reads <code>Data/raw/*.csv</code>, normalizes column names, enforces required schema, converts numeric fields, and removes invalid rows.</p>
+          <small><code>Data/raw -> Data/processed/cleaned_*.csv</code></small>
+        </article>
+
+        <article class="stage">
+          <div class="badge">2</div>
+          <h3>Windowing</h3>
+          <p>Splits each cleaned file into fixed windows of <strong>10,000 flows</strong>. For each window it computes volume, diversity, and rate features.</p>
+          <small><code>Data/processed -> Data/windowed/windowed_*.csv</code></small>
+        </article>
+
+        <article class="stage">
+          <div class="badge">3</div>
+          <h3>Baseline Modeling</h3>
+          <p>Uses Monday windowed traffic as reference behavior and computes mean/std per feature for later deviation scoring.</p>
+          <small><code>Data/windowed -> Models/baseline_model.json</code></small>
+        </article>
+
+        <article class="stage">
+          <div class="badge">4</div>
+          <h3>Monitoring + Inference</h3>
+          <p>Computes z-score profile per window, anomaly index, severity, likely pattern, confidence, and SOC action hint.</p>
+          <small><code>Models/alerts_output.csv + terminal alerts</code></small>
+        </article>
+      </div>
+    </section>
+
+    <section id="concepts" class="grid-2 reveal">
+      <article class="card">
+        <h2>How Windowing Works</h2>
+        <p>Windowing transforms row-level flows into behavior snapshots. Each snapshot is one analytic unit.</p>
+        <div class="formula">num_windows = total_rows // 10000</div>
+        <p>Each window produces features such as:</p>
+        <ul>
+          <li><code>total_bytes</code>, <code>total_packets</code></li>
+          <li><code>unique_source_ips</code>, <code>unique_destination_ips</code></li>
+          <li><code>unique_destination_ports</code></li>
+          <li><code>avg_flow_bytes_per_sec</code>, <code>avg_flow_packets_per_sec</code></li>
+          <li><code>avg_packets_per_flow</code></li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Z-Score and Anomaly Index</h2>
+        <p>Z-score compares how far a window metric moves from baseline behavior.</p>
+        <div class="formula">z = (value - mean) / std</div>
+        <p>Anomaly Index summarizes all metric deviations for that window:</p>
+        <div class="formula">anomaly_index = sum(abs(z_i))</div>
+
+        <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Anomaly Index</th><th>Severity</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>&lt; 3</td><td>LOW</td></tr>
+            <tr><td>3 to &lt; 6</td><td>MEDIUM</td></tr>
+            <tr><td>6 to &lt; 10</td><td>HIGH</td></tr>
+            <tr><td>&ge; 10</td><td>CRITICAL</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </article>
+    </section>
+
+    <section id="dataset" class="card reveal">
+      <h2>Static Dataset Assumption (Important)</h2>
+      <p>
+        This implementation is currently designed for a <strong>static, offline dataset</strong>. It processes stored CSV files,
+        not live packets or streaming telemetry. Results are deterministic for the same input files.
+      </p>
+      <div class="pill-row">
+        <span class="pill">Batch execution</span>
+        <span class="pill">No live stream ingestion</span>
+        <span class="pill">Reproducible runs</span>
+        <span class="pill">Good for experiments and demos</span>
+      </div>
+      <p class="section-note">
+        For production SOC use, the next step would be converting this pipeline to incremental or streaming processing.
+      </p>
+    </section>
+
+    <section id="alerts" class="grid-2 reveal">
+      <article class="card">
+        <h2>What Analysts See</h2>
+        <p>Alerts are intentionally compact and prioritize triage data, not raw dumps.</p>
+        <ul>
+          <li>Severity + anomaly snapshot</li>
+          <li>Likely pattern + confidence</li>
+          <li>Top 3 deviating indicators</li>
+          <li>Blast radius (unique src/dst/ports)</li>
+          <li>One-line action hint</li>
+        </ul>
+      </article>
+
+      <article class="card code-panel">
+<pre><code>LogSentinel Behavioral Anomaly Alert
+File          : Friday-...PortScan...
+Window ID     : 19
+Severity      : HIGH
+Likely Pattern: Possible PortScan
+Confidence    : High
+Anomaly Index : 8.74
+Top 3 Indicators:
+  1) unique_destination_ips   z=-6.66
+  2) unique_destination_ports z=+3.21
+  3) avg_flow_packets_per_sec z=-2.94</code></pre>
+      </article>
+    </section>
+
+    <section class="card reveal">
+      <h2>Project Structure</h2>
+<pre><code>.
+|-- main.py
+|-- logsentinel/
+|   |-- config.py
+|   |-- preprocessing.py
+|   |-- windowing.py
+|   |-- baseline.py
+|   |-- monitor.py
+|   `-- pipeline.py
+|-- Data/
+|   |-- raw/        # static input CSV files
+|   |-- processed/  # generated cleaned outputs
+|   `-- windowed/   # generated window metrics
+`-- Models/         # generated baseline + alert outputs</code></pre>
+    </section>
+
+    <section id="run" class="card reveal">
+      <h2>Run Commands</h2>
+      <div class="cmd-grid">
+        <button class="cmd" data-copy="pip install -r requirements.txt">pip install -r requirements.txt</button>
+        <button class="cmd" data-copy="python main.py">python main.py</button>
+        <button class="cmd" data-copy="python main.py --step preprocess">python main.py --step preprocess</button>
+        <button class="cmd" data-copy="python main.py --step window">python main.py --step window</button>
+        <button class="cmd" data-copy="python main.py --step baseline">python main.py --step baseline</button>
+        <button class="cmd" data-copy="python main.py --step monitor">python main.py --step monitor</button>
+      </div>
+      <h3>When and Why to Run Each Command</h3>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Command</th><th>When to run</th><th>Why</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>pip install -r requirements.txt</code></td>
+            <td>First project setup or on a new machine.</td>
+            <td>Installs required Python libraries (`pandas`, `numpy`).</td>
+          </tr>
+          <tr>
+            <td><code>python main.py</code></td>
+            <td>Normal end-to-end execution.</td>
+            <td>Runs all stages in order: preprocess, window, baseline, monitor.</td>
+          </tr>
+          <tr>
+            <td><code>python main.py --step preprocess</code></td>
+            <td>After changing/adding raw CSV files.</td>
+            <td>Regenerates cleaned datasets in <code>Data/processed</code>.</td>
+          </tr>
+          <tr>
+            <td><code>python main.py --step window</code></td>
+            <td>After preprocessing or window-size/config updates.</td>
+            <td>Builds window-level behavioral features in <code>Data/windowed</code>.</td>
+          </tr>
+          <tr>
+            <td><code>python main.py --step baseline</code></td>
+            <td>When baseline reference behavior should be refreshed.</td>
+            <td>Recomputes mean/std model from Monday windowed data.</td>
+          </tr>
+          <tr>
+            <td><code>python main.py --step monitor</code></td>
+            <td>After baseline is available and windowed files exist.</td>
+            <td>Scores deviations, generates alerts, and writes SOC output.</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

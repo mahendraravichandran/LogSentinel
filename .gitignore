@@ -1,0 +1,39 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# IDE/editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Generated pipeline artifacts
+Data/processed/*.csv
+Data/windowed/*.csv
+Models/*.json
+Models/*.csv
+
+# Logs
+*.log
+
+node_modules/
+package-lock.json
+package.json
+
+Data/raw/*.csv
+Data/processed/*.csv
+Data/windowed/*.csv
+Models/*.csv
+Models/*.json
+node_modules/
+package.json
+package-lock.json
