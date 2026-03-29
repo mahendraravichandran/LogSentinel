@@ -73,6 +73,20 @@ python main.py --step monitor
 3. `baseline`: Trains baseline statistics from Monday windowed data
 4. `monitor`: Scores deviations and writes SOC-ready alerts to `Models/alerts_output.csv`
 
+## Data Download
+Raw data is **not** stored in the repository. To run the pipeline:
+
+1. Download the CIC-IDS2017 flow CSVs from the official dataset page: https://www.unb.ca/cic/datasets/ids-2017.html (grab the `MachineLearningCSV.zip` archive).
+2. Extract all CSVs into `Data/raw/` so files look like `Data/raw/Monday-WorkingHours.pcap_ISCX.csv`, `Data/raw/Tuesday-WorkingHours.pcap_ISCX.csv`, etc.
+3. Leave `Data/processed`, `Data/windowed`, and `Models` empty; the pipeline will fill them.
+
+Example (bash):
+
+```bash
+mkdir -p Data/raw
+unzip ~/Downloads/MachineLearningCSV.zip -d Data/raw
+```
+
 ## Severity and Anomaly Index
 Anomaly Index is computed per window:
 
@@ -117,8 +131,8 @@ During monitoring, terminal alerts show:
 - SOC action hint
 
 ## Notes
-- `Data/processed`, `Data/windowed`, and `Models` are generated artifacts.
-- Keep only `Data/raw` under version control if repository size is a concern.
+- `Data/raw`, `Data/processed`, `Data/windowed`, and `Models` are **gitignored** to keep the repo lightweight.
+- After downloading raw CSVs, rerun the pipeline steps as needed to regenerate processed/windowed data and models locally.
 
 ## Troubleshooting
 - If baseline is missing: run `python main.py --step baseline`
