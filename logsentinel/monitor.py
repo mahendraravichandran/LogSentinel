@@ -14,8 +14,14 @@ Z_HIGH = 5
 
 
 def load_baseline():
-    with open(BASELINE_PATH, "r", encoding="utf-8") as file:
-        return json.load(file)
+    try:
+        with open(BASELINE_PATH, "r", encoding="utf-8") as file:
+            data = json.load(file)
+            print(f"[INFO] Loaded baseline model: {BASELINE_PATH}")
+            return data
+    except Exception as exc:
+        print(f"[ERROR] Failed to process file: {exc}")
+        return None
 
 
 def compute_z(value, mean, std):
@@ -156,9 +162,14 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
     print("\n=== BEHAVIORAL DEVIATION MONITOR STARTED ===")
 
     baseline = load_baseline()
+    if baseline is None:
+        print("[ERROR] Failed to process file: Baseline model could not be loaded.")
+        return pd.DataFrame()
+
     total_windows = 0
     total_alerts = 0
     alert_rows = []
+    file_alert_counts: dict[str, int] = {}
 
     files = sorted(
         [f for f in WINDOWED_DIR.glob("*.csv") if "Monday" not in f.name]
@@ -166,90 +177,98 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
 
     for file_path in files:
         print(f"\nProcessing file: {file_path.name}")
-        df = pd.read_csv(file_path)
-        previous_anomaly_index = None
+        file_alert_counts[file_path.name] = 0
+        try:
+            df = pd.read_csv(file_path)
+            print(f"[INFO] Loaded windowed dataset: {file_path} (windows: {len(df)})")
+            previous_anomaly_index = None
 
-        for _, row in df.iterrows():
-            total_windows += 1
-            window_id = int(row["window_id"])
-            deviating_metrics = []
-            max_z = 0
-            metric_z_scores = {}
+            for _, row in df.iterrows():
+                total_windows += 1
+                window_id = int(row["window_id"])
+                deviating_metrics = []
+                max_z = 0
+                metric_z_scores = {}
 
-            for metric in baseline.keys():
-                if metric not in row:
-                    continue
+                for metric in baseline.keys():
+                    if metric not in row:
+                        continue
 
-                value = row[metric]
-                mean = baseline[metric]["mean"]
-                std = baseline[metric]["std"]
-                z = compute_z(value, mean, std)
-                metric_z_scores[metric] = z
+                    value = row[metric]
+                    mean = baseline[metric]["mean"]
+                    std = baseline[metric]["std"]
+                    z = compute_z(value, mean, std)
+                    metric_z_scores[metric] = z
 
-                if abs(z) >= Z_MEDIUM:
-                    deviating_metrics.append(
-                        f"{metric} | value={round(value, 2)} | baseline={round(mean, 2)} | z={round(z, 2)}"
+                    if abs(z) >= Z_MEDIUM:
+                        deviating_metrics.append(
+                            f"{metric} | value={round(value, 2)} | baseline={round(mean, 2)} | z={round(z, 2)}"
+                        )
+
+                    if abs(z) > abs(max_z):
+                        max_z = z
+
+                anomaly_index = sum(abs(z) for z in metric_z_scores.values())
+                trend_label = anomaly_trend(previous_anomaly_index, anomaly_index)
+                previous_anomaly_index = anomaly_index
+                top_three = top_indicators(metric_z_scores, limit=3)
+                likely_pattern, confidence, action_hint = infer_pattern(metric_z_scores)
+
+                if len(deviating_metrics) >= 2 or abs(max_z) >= Z_HIGH:
+                    severity = classify_severity(
+                        anomaly_index,
+                        ANOMALY_INDEX_THRESHOLDS,
+                    )
+                    total_alerts += 1
+                    file_alert_counts[file_path.name] += 1
+
+                    print_alert(
+                        file_path.name,
+                        window_id,
+                        severity,
+                        max_z,
+                        anomaly_index,
+                        top_three,
+                        trend_label,
+                        likely_pattern,
+                        confidence,
+                        action_hint,
+                        int(row.get("unique_source_ips", 0)),
+                        int(row.get("unique_destination_ips", 0)),
+                        int(row.get("unique_destination_ports", 0)),
+                        row.get("attack_ratio", float("nan")),
                     )
 
-                if abs(z) > abs(max_z):
-                    max_z = z
-
-            anomaly_index = sum(abs(z) for z in metric_z_scores.values())
-            trend_label = anomaly_trend(previous_anomaly_index, anomaly_index)
-            previous_anomaly_index = anomaly_index
-            top_three = top_indicators(metric_z_scores, limit=3)
-            likely_pattern, confidence, action_hint = infer_pattern(metric_z_scores)
-
-            if len(deviating_metrics) >= 2 or abs(max_z) >= Z_HIGH:
-                severity = classify_severity(
-                    anomaly_index,
-                    ANOMALY_INDEX_THRESHOLDS,
-                )
-                total_alerts += 1
-
-                print_alert(
-                    file_path.name,
-                    window_id,
-                    severity,
-                    max_z,
-                    anomaly_index,
-                    top_three,
-                    trend_label,
-                    likely_pattern,
-                    confidence,
-                    action_hint,
-                    int(row.get("unique_source_ips", 0)),
-                    int(row.get("unique_destination_ips", 0)),
-                    int(row.get("unique_destination_ports", 0)),
-                    row.get("attack_ratio", float("nan")),
-                )
-
-                alert_rows.append(
-                    {
-                        "file": file_path.name,
-                        "window_id": window_id,
-                        "severity": severity,
-                        "likely_pattern": likely_pattern,
-                        "confidence": confidence,
-                        "anomaly_index": round(float(anomaly_index), 4),
-                        "max_z_score": round(float(max_z), 4),
-                        "top_indicators": " || ".join(
-                            [f"{metric}:{z_value:.2f}" for metric, z_value in top_three]
-                        ),
-                        "trend": trend_label,
-                        "unique_source_ips": int(row.get("unique_source_ips", 0)),
-                        "unique_destination_ips": int(row.get("unique_destination_ips", 0)),
-                        "unique_destination_ports": int(
-                            row.get("unique_destination_ports", 0)
-                        ),
-                        "attack_ratio": (
-                            round(float(row.get("attack_ratio")), 4)
-                            if pd.notna(row.get("attack_ratio", float("nan")))
-                            else None
-                        ),
-                        "soc_action_hint": action_hint,
-                    }
-                )
+                    alert_rows.append(
+                        {
+                            "file": file_path.name,
+                            "window_id": window_id,
+                            "severity": severity,
+                            "likely_pattern": likely_pattern,
+                            "confidence": confidence,
+                            "anomaly_index": round(float(anomaly_index), 4),
+                            "max_z_score": round(float(max_z), 4),
+                            "top_indicators": " || ".join(
+                                [f"{metric}:{z_value:.2f}" for metric, z_value in top_three]
+                            ),
+                            "trend": trend_label,
+                            "unique_source_ips": int(row.get("unique_source_ips", 0)),
+                            "unique_destination_ips": int(row.get("unique_destination_ips", 0)),
+                            "unique_destination_ports": int(
+                                row.get("unique_destination_ports", 0)
+                            ),
+                            "attack_ratio": (
+                                round(float(row.get("attack_ratio")), 4)
+                                if pd.notna(row.get("attack_ratio", float("nan")))
+                                else None
+                            ),
+                            "soc_action_hint": action_hint,
+                        }
+                    )
+        except Exception as exc:
+            print(f"[ERROR] Failed to process file: {exc}")
+            print(f"Skipping monitoring for file due to error: {exc}")
+            continue
 
     print("\n" + "=" * 80)
     print("MONITORING SUMMARY")
@@ -264,6 +283,28 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
         ALERTS_OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
         alerts_df.to_csv(ALERTS_OUTPUT_PATH, index=False)
         print(f"\nSaved alerts to: {ALERTS_OUTPUT_PATH}")
+
+    day_alert_counts = {
+        "monday": 0,
+        "tuesday": 0,
+        "wednesday": 0,
+        "thursday": 0,
+        "friday": 0,
+    }
+
+    for file_name, count in file_alert_counts.items():
+        lower_name = file_name.lower()
+        for day in day_alert_counts:
+            if day in lower_name:
+                day_alert_counts[day] += count
+                break
+
+    print("\n[COMPARISON SUMMARY]")
+    print(f"{'Monday (benign)':<20} -> {day_alert_counts['monday']} alerts")
+    print(f"{'Tuesday':<20} -> {day_alert_counts['tuesday']} alerts")
+    print(f"{'Wednesday':<20} -> {day_alert_counts['wednesday']} alerts")
+    print(f"{'Thursday':<20} -> {day_alert_counts['thursday']} alerts")
+    print(f"{'Friday (attack)':<20} -> {day_alert_counts['friday']} alerts")
 
     print("\n=== Monitoring Completed ===")
     return alerts_df

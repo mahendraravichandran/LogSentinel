@@ -1,7 +1,7 @@
 import argparse
+import time
 
 from logsentinel.pipeline import run_pipeline
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -17,8 +17,15 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    args = parse_args()
-    run_pipeline(args.step)
+    start_time = time.time()
+    try:
+        args = parse_args()
+        run_pipeline(args.step)
+    except Exception as exc:
+        print(f"[ERROR] Failed to process pipeline: {exc}")
+    finally:
+        elapsed = time.time() - start_time
+        print(f"[PERFORMANCE] Execution Time: {elapsed:.2f} seconds")
 
 
 if __name__ == "__main__":

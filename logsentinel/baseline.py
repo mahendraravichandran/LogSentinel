@@ -14,7 +14,13 @@ def build_baseline() -> None:
         return
 
     print("\nLoading Monday windowed data...")
-    df = pd.read_csv(file_path)
+    try:
+        df = pd.read_csv(file_path)
+        print(f"[INFO] Loaded baseline dataset: {file_path} (rows: {len(df)})")
+    except Exception as exc:
+        print(f"[ERROR] Failed to process file: {exc}")
+        print("Baseline build aborted.")
+        return
 
     columns_to_exclude = ["window_id", "attack_ratio"]
     feature_columns = [col for col in df.columns if col not in columns_to_exclude]
@@ -41,6 +47,8 @@ def build_baseline() -> None:
         print(f"{col}")
         print(f"   Mean: {round(mean, 4)}")
         print(f"   Std : {round(std, 4)}\n")
+
+    print(f"[INFO] Feature extraction completed for baseline model.")
 
     BASELINE_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(BASELINE_PATH, "w", encoding="utf-8") as file:

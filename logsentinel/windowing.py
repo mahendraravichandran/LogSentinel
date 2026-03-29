@@ -61,11 +61,19 @@ def create_windows(df: pd.DataFrame) -> pd.DataFrame:
 
 def process_file(file_path, output_path) -> None:
     print(f"\nProcessing window aggregation for: {file_path}")
-    df = pd.read_csv(file_path)
-    window_df = create_windows(df)
-    window_df.to_csv(output_path, index=False)
-    print(f"Saved windowed file to: {output_path}")
-    print("-" * 60)
+    try:
+        df = pd.read_csv(file_path)
+        print(f"[INFO] Loaded processed dataset: {file_path} (rows: {len(df)})")
+        window_df = create_windows(df)
+        print(f"[INFO] Windows created: {len(window_df)}")
+        print(f"[INFO] Feature extraction completed for: {file_path.name}")
+        window_df.to_csv(output_path, index=False)
+        print(f"Saved windowed file to: {output_path}")
+    except Exception as exc:
+        print(f"[ERROR] Failed to process file: {exc}")
+        print(f"Skipping windowing for file due to error: {exc}")
+    finally:
+        print("-" * 60)
 
 
 def run_windowing() -> None:

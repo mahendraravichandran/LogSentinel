@@ -33,6 +33,7 @@ def preprocess_file(file_path: Path, output_path: Path) -> None:
 
     try:
         df = read_csv_safely(file_path)
+        print(f"[INFO] Loaded dataset: {file_path} (rows: {len(df)})")
         df = clean_column_names(df)
 
         missing = [col for col in REQUIRED_COLUMNS if col not in df.columns]
@@ -43,6 +44,7 @@ def preprocess_file(file_path: Path, output_path: Path) -> None:
         df = df[REQUIRED_COLUMNS]
         df = convert_numeric_columns(df)
         df = df.dropna()
+        print(f"[INFO] Rows processed (after cleaning): {len(df)}")
 
         df.to_csv(output_path, index=False)
 
@@ -51,6 +53,7 @@ def preprocess_file(file_path: Path, output_path: Path) -> None:
         print("-" * 60)
 
     except Exception as exc:
+        print(f"[ERROR] Failed to process file: {exc}")
         print(f"Skipping file due to error: {exc}")
         print("-" * 60)
 
