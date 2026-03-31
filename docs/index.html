@@ -18,8 +18,12 @@
     <a href="#pipeline">Pipeline</a>
     <a href="#concepts">Concepts</a>
     <a href="#dataset">Dataset</a>
-    <a href="#alerts">Alerts</a>
+    <a href="#outputs">Outputs</a>
+    <a href="#logic">Logic</a>
+    <a href="#config">Config</a>
     <a href="#run">Run</a>
+    <a href="#perf">Performance</a>
+    <a href="#troubleshoot">Troubleshoot</a>
   </nav>
 
   <header class="hero reveal">
@@ -31,6 +35,7 @@
     </p>
     <div class="hero-actions">
       <a class="btn outline" href="#pipeline">View Pipeline</a>
+      <a class="btn solid" href="https://github.com/mahendraravichandran/LogSentinel" target="_blank" rel="noreferrer">View on GitHub</a>
     </div>
     <div class="hero-stats">
       <div><span>Window Size</span><strong>10,000 flows</strong></div>
@@ -128,22 +133,27 @@
       <p class="section-note">
         For production SOC use, the next step would be converting this pipeline to incremental or streaming processing.
       </p>
+
+      <h3>Download + Place Data</h3>
+      <ol>
+        <li>Download the "MachineLearningCSV" archive from the <a href="https://www.unb.ca/cic/datasets/ids-2017.html" target="_blank" rel="noreferrer">official CIC-IDS2017 page</a>.</li>
+        <li>Extract all CSVs into <code>Data/raw/</code> (eight files: Monday-Friday variants).</li>
+        <li>Leave <code>Data/processed</code>, <code>Data/windowed</code>, and <code>Models</code> empty; the pipeline fills them.</li>
+      </ol>
     </section>
 
-    <section id="alerts" class="grid-2 reveal">
-      <article class="card">
-        <h2>What Analysts See</h2>
-        <p>Alerts are intentionally compact and prioritize triage data, not raw dumps.</p>
-        <ul>
-          <li>Severity + anomaly snapshot</li>
-          <li>Likely pattern + confidence</li>
-          <li>Top 3 deviating indicators</li>
-          <li>Blast radius (unique src/dst/ports)</li>
-          <li>One-line action hint</li>
-        </ul>
-      </article>
-
-      <article class="card code-panel">
+    <section id="outputs" class="card reveal">
+      <h2>Pipeline Outputs</h2>
+      <div class="grid-2">
+        <div>
+          <ul>
+            <li><code>Data/processed/cleaned_*.csv</code> &mdash; schema-validated, numeric-cast flows.</li>
+            <li><code>Data/windowed/windowed_*.csv</code> &mdash; 10k-flow windows with volume/diversity/rate features.</li>
+            <li><code>Models/baseline_model.json</code> &mdash; mean/std per feature from Monday.</li>
+            <li><code>Models/alerts_output.csv</code> &mdash; SOC alerts for non-Monday traffic.</li>
+          </ul>
+        </div>
+        <div class="code-panel">
 <pre><code>LogSentinel Behavioral Anomaly Alert
 File          : Friday-...PortScan...
 Window ID     : 19
@@ -155,7 +165,49 @@ Top 3 Indicators:
   1) unique_destination_ips   z=-6.66
   2) unique_destination_ports z=+3.21
   3) avg_flow_packets_per_sec z=-2.94</code></pre>
-      </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="logic" class="card reveal">
+      <h2>Detection Logic</h2>
+      <div class="grid-2">
+        <div>
+          <h3>Alert trigger</h3>
+          <ul>
+            <li>&ge; 2 metrics with |z| &ge; 3, <strong>or</strong></li>
+            <li>Any single metric with |z| &ge; 5.</li>
+          </ul>
+          <p>Anomaly Index = sum(|z|) across metrics; severity buckets: &lt;3 LOW, 3-&lt;6 MEDIUM, 6-&lt;10 HIGH, &ge;10 CRITICAL.</p>
+        </div>
+        <div>
+          <h3>Pattern heuristic</h3>
+          <ul>
+            <li><strong>PortScan:</strong> very low <code>unique_destination_ips</code>, high <code>unique_destination_ports</code>.</li>
+            <li><strong>DDoS:</strong> very low destination IP diversity plus high packet volume/rate deviation.</li>
+            <li><strong>Infiltration:</strong> destination diversity drops while packet rate spikes.</li>
+            <li><strong>Web Attack:</strong> high <code>unique_source_ips</code> with elevated packet rate.</li>
+            <li><strong>Unknown:</strong> review top deviating metrics.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="config" class="card reveal">
+      <h2>Configuration Cheatsheet</h2>
+      <div class="grid-2">
+        <div>
+          <ul>
+            <li><code>WINDOW_SIZE</code> (default 10,000 flows)</li>
+            <li><code>ANOMALY_INDEX_THRESHOLDS</code> (LOW/MEDIUM/HIGH/CRITICAL cutoffs)</li>
+            <li><code>RAW_DIR</code>, <code>PROCESSED_DIR</code>, <code>WINDOWED_DIR</code>, <code>MODELS_DIR</code></li>
+            <li><code>MONDAY_WINDOWED_FILE</code> (baseline source)</li>
+          </ul>
+        </div>
+        <div class="section-note">
+          Edit these in <code>logsentinel/config.py</code>, then rerun the affected stage (windowing, baseline, or monitor). Keep window size aligned with your data volume and memory budget.
+        </div>
+      </div>
     </section>
 
     <section class="card reveal">
@@ -226,6 +278,25 @@ Top 3 Indicators:
         </tbody>
       </table>
       </div>
+    </section>
+
+    <section id="perf" class="card reveal">
+      <h2>Performance Notes</h2>
+      <ul>
+        <li>CIC-IDS2017 CSVs are large (hundreds of MB); prefer machines with &gt;8 GB RAM.</li>
+        <li>Windowing is O(rows); 10k-flow windows balance fidelity and compute. Increase cautiously.</li>
+        <li>Baseline and monitor reuse intermediates—rerun only the needed stages to save time.</li>
+      </ul>
+    </section>
+
+    <section id="troubleshoot" class="card reveal">
+      <h2>Troubleshooting</h2>
+      <ul>
+        <li><strong>Missing required columns:</strong> file is skipped; verify column names exactly.</li>
+        <li><strong>Baseline missing:</strong> ensure <code>Data/windowed/windowed_cleaned_Monday-WorkingHours.pcap_ISCX.csv</code> exists, then rerun <code>--step baseline</code>.</li>
+        <li><strong>Encoding issues:</strong> loader automatically tries utf-8, cp1252, then latin1.</li>
+        <li><strong>No alerts produced:</strong> confirm non-Monday windowed files exist and baseline is present.</li>
+      </ul>
     </section>
   </main>
 
