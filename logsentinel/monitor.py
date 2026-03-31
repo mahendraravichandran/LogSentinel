@@ -8,6 +8,7 @@ from .config import (
     BASELINE_PATH,
     WINDOWED_DIR,
 )
+from .isolation_forest_model import load_isolation_forest, predict_isolation_forest
 
 Z_MEDIUM = 3
 Z_HIGH = 5
@@ -125,6 +126,10 @@ def print_alert(
     unique_destination_ips,
     unique_destination_ports,
     attack_ratio,
+    iforest_flag,
+    iforest_score,
+    final_decision,
+    final_confidence,
 ):
     print("\n" + "=" * 80)
     print("LogSentinel Behavioral Anomaly Alert")
@@ -134,6 +139,10 @@ def print_alert(
     print(f"Severity      : {severity}")
     print(f"Likely Pattern: {likely_pattern}")
     print(f"Confidence    : {confidence}")
+    print(f"IsolationForest   : {iforest_flag}")
+    if iforest_score is not None:
+        print(f"IF Score          : {iforest_score:.4f}")
+    print(f"Final Decision    : {final_decision} ({final_confidence})")
     print("")
     print("Anomaly Snapshot:")
     print(f"  Anomaly Index : {round(anomaly_index, 2)}")
@@ -166,6 +175,10 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
         print("[ERROR] Failed to process file: Baseline model could not be loaded.")
         return pd.DataFrame()
 
+    iforest_model = load_isolation_forest()
+    if iforest_model is None:
+        print("[IFOREST] Proceeding without IsolationForest model.")
+
     total_windows = 0
     total_alerts = 0
     alert_rows = []
@@ -183,7 +196,13 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
             print(f"[INFO] Loaded windowed dataset: {file_path} (windows: {len(df)})")
             previous_anomaly_index = None
 
-            for _, row in df.iterrows():
+            # Pre-compute IsolationForest predictions if model available
+            if iforest_model is not None:
+                if_preds, if_scores = predict_isolation_forest(df, iforest_model)
+            else:
+                if_preds, if_scores = None, None
+
+            for idx, row in df.iterrows():
                 total_windows += 1
                 window_id = int(row["window_id"])
                 deviating_metrics = []
@@ -222,6 +241,30 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
                     total_alerts += 1
                     file_alert_counts[file_path.name] += 1
 
+                    # IsolationForest inference for this window
+                    if_pred = if_preds[idx] if if_preds is not None else None
+                    if_score = float(if_scores[idx]) if if_scores is not None else None
+                    if_flag = (
+                        "Anomaly" if if_pred == -1 else "Normal"
+                        if if_pred is not None
+                        else "N/A"
+                    )
+
+                    # Hybrid decision
+                    z_trigger = True
+                    if_trigger = if_pred == -1 if if_pred is not None else False
+
+                    if z_trigger and if_trigger:
+                        final_decision = "CONFIRMED ANOMALY"
+                        final_confidence = "High"
+                    elif z_trigger or if_trigger:
+                        final_decision = "SUSPICIOUS"
+                        final_confidence = "Medium"
+                    else:
+                        final_decision = "NORMAL"
+                        final_confidence = "Low"
+
+                    # Keep existing confidence but augment final decision context
                     print_alert(
                         file_path.name,
                         window_id,
@@ -237,6 +280,10 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
                         int(row.get("unique_destination_ips", 0)),
                         int(row.get("unique_destination_ports", 0)),
                         row.get("attack_ratio", float("nan")),
+                        if_flag,
+                        if_score,
+                        final_decision,
+                        final_confidence,
                     )
 
                     alert_rows.append(
@@ -263,6 +310,9 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
                                 else None
                             ),
                             "soc_action_hint": action_hint,
+                            "iforest_prediction": if_pred,
+                            "iforest_score": if_score,
+                            "final_decision": final_decision,
                         }
                     )
         except Exception as exc:

@@ -9,6 +9,7 @@ LogSentinel is a Python pipeline that ingests CIC-IDS2017 flow CSVs, builds a ba
 - Baseline modeling from Monday (benign) traffic
 - Z-score scoring + anomaly index severity buckets
 - SOC-focused alert context: severity, pattern guess, confidence, trend, top indicators, blast radius, action hint
+- Hybrid detection: Isolation Forest layer (trained on Monday) alongside Z-score
 
 ## Repository Layout
 ```
@@ -66,11 +67,14 @@ python main.py --step monitor      # scores Tue-Fri, writes Models/alerts_output
 ```
 Execution time is printed on exit.
 
+Isolation Forest is trained automatically after baseline (uses Monday windowed data) and loaded during monitoring; no new CLI flags required.
+
 ## Configuration (`logsentinel/config.py`)
 - `WINDOW_SIZE`: default `10000` flows per window
 - `ANOMALY_INDEX_THRESHOLDS`: LOW <3, MEDIUM 3-<6, HIGH 6-<10, CRITICAL >=10
 - Paths: `RAW_DIR`, `PROCESSED_DIR`, `WINDOWED_DIR`, `MODELS_DIR`
 - Monday reference file: `MONDAY_WINDOWED_FILE`
+- Model paths: `BASELINE_PATH`, `ALERTS_OUTPUT_PATH`, `isolation_forest_model.pkl`
 
 Change values in `config.py` and rerun the relevant stages.
 
@@ -78,7 +82,7 @@ Change values in `config.py` and rerun the relevant stages.
 - Cleaned CSVs -> `Data/processed/cleaned_*.csv`
 - Windowed feature CSVs -> `Data/windowed/windowed_*.csv`
 - Baseline model -> `Models/baseline_model.json`
-- Alerts -> `Models/alerts_output.csv` (also printed to terminal)
+- Alerts -> `Models/alerts_output.csv` (also printed to terminal) with extra columns: `iforest_prediction`, `iforest_score`, `final_decision`
 
 Example alert row (truncated):
 ```

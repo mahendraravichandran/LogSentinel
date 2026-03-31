@@ -155,7 +155,8 @@
             <li><code>Data/processed/cleaned_*.csv</code> &mdash; schema-validated, numeric-cast flows.</li>
             <li><code>Data/windowed/windowed_*.csv</code> &mdash; 10k-flow windows with volume/diversity/rate features.</li>
             <li><code>Models/baseline_model.json</code> &mdash; mean/std per feature from Monday.</li>
-            <li><code>Models/alerts_output.csv</code> &mdash; SOC alerts for non-Monday traffic.</li>
+            <li><code>Models/alerts_output.csv</code> &mdash; SOC alerts for non-Monday traffic (includes IsolationForest fields).</li>
+            <li><code>Models/isolation_forest_model.pkl</code> &mdash; IsolationForest model trained on Monday windows.</li>
           </ul>
         </div>
         <div class="code-panel">
@@ -194,6 +195,7 @@ Top 3 Indicators:
             <li><strong>Web Attack:</strong> high <code>unique_source_ips</code> with elevated packet rate.</li>
             <li><strong>Unknown:</strong> review top deviating metrics.</li>
           </ul>
+          <p class="section-note">IsolationForest runs alongside Z-score: model anomalies are shown as "IsolationForest: Anomaly" with score; final decision is CONFIRMED / SUSPICIOUS / NORMAL based on agreement.</p>
         </div>
       </div>
     </section>
