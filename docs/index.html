@@ -20,10 +20,15 @@
     <a href="#dataset">Dataset</a>
     <a href="#outputs">Outputs</a>
     <a href="#logic">Logic</a>
+    <a href="#runbook">Runbook</a>
+    <a href="#tuning">Tuning</a>
+    <a href="#schema">Schema</a>
+    <a href="#patterns">Signals</a>
     <a href="#config">Config</a>
     <a href="#run">Run</a>
     <a href="#perf">Performance</a>
     <a href="#troubleshoot">Troubleshoot</a>
+    <a href="#support">Support</a>
   </nav>
 
   <header class="hero reveal">
@@ -193,6 +198,105 @@ Top 3 Indicators:
       </div>
     </section>
 
+    <section id="runbook" class="card reveal">
+      <h2>Runbook (when to run what)</h2>
+      <ul>
+        <li><strong>New raw CSVs added</strong> &rarr; run <code>--step preprocess</code> then <code>--step window</code>.</li>
+        <li><strong>Changed window size</strong> &rarr; rerun <code>--step window</code>, then <code>--step baseline</code>, then <code>--step monitor</code>.</li>
+        <li><strong>Changed thresholds</strong> &rarr; rerun <code>--step monitor</code> only.</li>
+        <li><strong>Need fresh baseline</strong> (new Monday file) &rarr; rerun <code>--step baseline</code> then <code>--step monitor</code>.</li>
+        <li><strong>Full rebuild</strong> &rarr; run <code>python main.py</code>.</li>
+      </ul>
+    </section>
+
+    <section id="tuning" class="card reveal">
+      <h2>Tuning Cheatsheet</h2>
+      <div class="grid-2">
+        <div>
+          <h3>Window size</h3>
+          <ul>
+            <li>Lower (e.g., 5,000) = finer time granularity, more windows, more compute.</li>
+            <li>Higher (e.g., 20,000) = smoother signals, fewer windows, less compute.</li>
+            <li>Keep consistent with your memory budget; recompute baseline after changes.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Severity thresholds</h3>
+          <ul>
+            <li>Current: LOW &lt;3, MEDIUM 3-&lt;6, HIGH 6-&lt;10, CRITICAL &ge;10.</li>
+            <li>More sensitive: lower all cutoffs (e.g., 2 / 4 / 8).</li>
+            <li>Less noisy: raise cutoffs (e.g., 4 / 8 / 12).</li>
+            <li>Only rerun <code>--step monitor</code> after threshold edits.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="patterns" class="card reveal">
+      <h2>Pattern Signals (why you see a label)</h2>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Pattern</th><th>Primary signals</th><th>Action hint</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>PortScan</td>
+            <td>Low <code>unique_destination_ips</code>, high <code>unique_destination_ports</code></td>
+            <td>Investigate top source IPs for horizontal scans; block repeat probes.</td>
+          </tr>
+          <tr>
+            <td>DDoS</td>
+            <td>Low destination diversity plus high packet volume/rate deviation</td>
+            <td>Validate volumetric flood; rate-limit and apply upstream filtering.</td>
+          </tr>
+          <tr>
+            <td>Infiltration</td>
+            <td>Destination diversity drops while packet rate spikes</td>
+            <td>Correlate with endpoint telemetry and unusual outbound sessions.</td>
+          </tr>
+          <tr>
+            <td>Web Attack</td>
+            <td>High <code>unique_source_ips</code> with elevated packet rate</td>
+            <td>Review web server logs for bursty patterns and exploit signatures.</td>
+          </tr>
+          <tr>
+            <td>Unknown</td>
+            <td>Does not match heuristics; check top deviating metrics</td>
+            <td>Pivot on indicators and correlate with firewall/DNS/endpoint logs.</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="schema" class="card reveal">
+      <h2>Input Schema (required columns)</h2>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Source IP</td><td>string</td><td>Exact name required</td></tr>
+          <tr><td>Destination IP</td><td>string</td><td>Exact name required</td></tr>
+          <tr><td>Source Port</td><td>numeric</td><td>Coerced to number</td></tr>
+          <tr><td>Destination Port</td><td>numeric</td><td>Coerced to number</td></tr>
+          <tr><td>Protocol</td><td>numeric</td><td>Coerced to number</td></tr>
+          <tr><td>Flow Duration</td><td>numeric</td><td>Coerced to number</td></tr>
+          <tr><td>Total Fwd Packets</td><td>numeric</td><td>Coerced to number</td></tr>
+          <tr><td>Total Backward Packets</td><td>numeric</td><td>Coerced to number</td></tr>
+          <tr><td>Total Length of Fwd Packets</td><td>numeric</td><td>Coerced to number</td></tr>
+          <tr><td>Total Length of Bwd Packets</td><td>numeric</td><td>Coerced to number</td></tr>
+          <tr><td>Flow Bytes/s</td><td>numeric</td><td>Coerced to number</td></tr>
+          <tr><td>Flow Packets/s</td><td>numeric</td><td>Coerced to number</td></tr>
+          <tr><td>Label</td><td>string</td><td>Used to compute attack ratio</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p class="section-note">Column names are case-sensitive. Files missing any required column are skipped during preprocessing.</p>
+    </section>
+
     <section id="config" class="card reveal">
       <h2>Configuration Cheatsheet</h2>
       <div class="grid-2">
@@ -298,8 +402,21 @@ Top 3 Indicators:
         <li><strong>No alerts produced:</strong> confirm non-Monday windowed files exist and baseline is present.</li>
       </ul>
     </section>
+
+    <section id="support" class="card reveal">
+      <h2>Support and Links</h2>
+      <ul>
+        <li><a href="https://github.com/mahendraravichandran/LogSentinel" target="_blank" rel="noreferrer">Repository</a></li>
+        <li><a href="https://github.com/mahendraravichandran/LogSentinel/issues" target="_blank" rel="noreferrer">Issues</a></li>
+        <li><a href="https://github.com/mahendraravichandran/LogSentinel/blob/main/README.md" target="_blank" rel="noreferrer">README</a></li>
+      </ul>
+      <p class="section-note">For questions, open an issue with the stage, command, and a short excerpt of the error.</p>
+    </section>
   </main>
 
+  <footer>
+    Built from main@3d9cb56
+  </footer>
   <script src="app.js"></script>
 </body>
 </html>
