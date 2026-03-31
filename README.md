@@ -11,6 +11,11 @@ LogSentinel is a Python pipeline that ingests CIC-IDS2017 flow CSVs, builds a ba
 - SOC-focused alert context: severity, pattern guess, confidence, trend, top indicators, blast radius, action hint
 - Hybrid detection: Isolation Forest layer (trained on Monday) alongside Z-score
 
+## Why both Z-score and IsolationForest?
+- **Z-score**: fast, transparent, threshold-based; great for explainability and consistent SOC tuning.
+- **IsolationForest**: tree-based unsupervised model that catches nonlinear/interaction patterns the Z-score may miss.
+- **Fusion**: an alert is elevated to “CONFIRMED ANOMALY” only when both agree; single-sided triggers are marked “SUSPICIOUS” to reduce false positives while still surfacing weak signals.
+
 ## Repository Layout
 ```
 .
@@ -118,11 +123,19 @@ trend=Up (prev: 7.23 -> current: 15.69)
   - Infiltration: drop in `unique_destination_ips` with spike in packet rate.
   - Web Attack: high `unique_source_ips` with high packet rate.
   - Else: Unknown (review indicators).
+- IsolationForest runs alongside Z-score; its Normal/Anomaly flag and score contribute to the fused final decision (Confirmed / Suspicious / Normal).
 
 ## Performance Notes
 - CIC-IDS2017 CSVs are large (hundreds of MB). Ensure >8 GB RAM for smooth pandas reads.
 - Windowing is O(rows); window size 10k balances fidelity vs compute. Increase cautiously.
 - Baseline/monitoring reuse intermediate files; rerun only needed stages to save time.
+
+## Limitations
+- Offline/batch only; no streaming ingestion.
+- Assumes Monday traffic is benign and representative; drift can degrade both Z-score and IsolationForest.
+- No IP/port enrichment or threat intel context; alerts are behavior-only.
+- Static thresholds; no adaptive calibration or feedback loop.
+- IsolationForest retraining is tied to Monday data presence and not versioned beyond the saved pickle.
 
 ## Troubleshooting
 - Missing required columns -> file is skipped in preprocessing; check column names exactly.
@@ -135,3 +148,5 @@ trend=Up (prev: 7.23 -> current: 15.69)
 - Dockerfile for reproducible runtime.
 - Streaming/online windowing option.
 - Configurable CLI flags for thresholds and window size.
+- Add enrichment (top talkers, ports) to alerts.
+- Automate retraining cadence for IsolationForest and baseline.

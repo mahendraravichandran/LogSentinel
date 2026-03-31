@@ -20,6 +20,7 @@
     <a href="#dataset">Dataset</a>
     <a href="#outputs">Outputs</a>
     <a href="#logic">Logic</a>
+    <a href="#why">Why Both</a>
     <a href="#runbook">Runbook</a>
     <a href="#tuning">Tuning</a>
     <a href="#schema">Schema</a>
@@ -27,6 +28,7 @@
     <a href="#config">Config</a>
     <a href="#run">Run</a>
     <a href="#perf">Performance</a>
+    <a href="#limits">Limits</a>
     <a href="#troubleshoot">Troubleshoot</a>
     <a href="#support">Support</a>
   </nav>
@@ -198,6 +200,15 @@ Top 3 Indicators:
           <p class="section-note">IsolationForest runs alongside Z-score: model anomalies are shown as "IsolationForest: Anomaly" with score; final decision is CONFIRMED / SUSPICIOUS / NORMAL based on agreement.</p>
         </div>
       </div>
+    </section>
+
+    <section id="why" class="card reveal">
+      <h2>Why Z-Score + IsolationForest</h2>
+      <ul>
+        <li><strong>Z-score</strong>: fast, transparent thresholds; great for explainability and tuning.</li>
+        <li><strong>IsolationForest</strong>: tree-based, captures nonlinear/interaction patterns.</li>
+        <li><strong>Fusion</strong>: both agree → CONFIRMED ANOMALY; only one fires → SUSPICIOUS; neither → NORMAL. Reduces false positives while still surfacing weak signals.</li>
+      </ul>
     </section>
 
     <section id="runbook" class="card reveal">
@@ -395,6 +406,31 @@ Top 3 Indicators:
       </ul>
     </section>
 
+    <section id="limits" class="card reveal">
+      <h2>Limitations & Future Ideas</h2>
+      <div class="grid-2">
+        <div>
+          <h3>Current Limits</h3>
+          <ul>
+            <li>Offline/batch only; no streaming ingestion.</li>
+            <li>Assumes Monday traffic is benign; drift can affect both detectors.</li>
+            <li>No enrichment (top talkers/ports/intel); alerts are behavior-only.</li>
+            <li>Static thresholds; no adaptive feedback loop.</li>
+            <li>IsolationForest retraining tied to Monday file and single saved model.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Future Ideas</h3>
+          <ul>
+            <li>Streaming/incremental windowing.</li>
+            <li>Alert enrichment with top IPs/ports and intel context.</li>
+            <li>Adaptive thresholding and feedback-driven tuning.</li>
+            <li>Scheduled retraining/versioning for baseline and IsolationForest.</li>
+            <li>Lightweight CI/tests for data schema and scoring sanity checks.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
     <section id="troubleshoot" class="card reveal">
       <h2>Troubleshooting</h2>
       <ul>
