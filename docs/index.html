@@ -156,7 +156,6 @@
             <li><code>Data/windowed/windowed_*.csv</code> &mdash; 10k-flow windows with volume/diversity/rate features.</li>
             <li><code>Models/baseline_model.json</code> &mdash; mean/std per feature from Monday.</li>
             <li><code>Models/alerts_output.csv</code> &mdash; SOC alerts for non-Monday traffic.</li>
-            <li><code>Models/iforest_model.pkl</code> and <code>Models/iforest_alerts_output.csv</code> &mdash; IsolationForest model + alerts.</li>
           </ul>
         </div>
         <div class="code-panel">
@@ -195,7 +194,6 @@ Top 3 Indicators:
             <li><strong>Web Attack:</strong> high <code>unique_source_ips</code> with elevated packet rate.</li>
             <li><strong>Unknown:</strong> review top deviating metrics.</li>
           </ul>
-          <p class="section-note">IsolationForest mode (optional) learns normality from Monday windows and flags anomalies via decision_function scores and model predictions.</p>
         </div>
       </div>
     </section>
@@ -343,9 +341,6 @@ Top 3 Indicators:
         <button class="cmd" data-copy="python main.py --step window">python main.py --step window</button>
         <button class="cmd" data-copy="python main.py --step baseline">python main.py --step baseline</button>
         <button class="cmd" data-copy="python main.py --step monitor">python main.py --step monitor</button>
-        <button class="cmd" data-copy="python main.py --step iforest">python main.py --step iforest</button>
-        <button class="cmd" data-copy="python main.py --step iforest-train">python main.py --step iforest-train</button>
-        <button class="cmd" data-copy="python main.py --step iforest-monitor">python main.py --step iforest-monitor</button>
       </div>
       <h3>When and Why to Run Each Command</h3>
       <div class="table-wrap">
@@ -383,21 +378,6 @@ Top 3 Indicators:
             <td><code>python main.py --step monitor</code></td>
             <td>After baseline is available and windowed files exist.</td>
             <td>Scores deviations, generates alerts, and writes SOC output.</td>
-          </tr>
-          <tr>
-            <td><code>python main.py --step iforest</code></td>
-            <td>End-to-end IsolationForest (train + score).</td>
-            <td>Unsup detector alternative to stats baseline; trains on Monday, scores Tue-Fri.</td>
-          </tr>
-          <tr>
-            <td><code>python main.py --step iforest-train</code></td>
-            <td>When Monday windowed file changes.</td>
-            <td>Retrains IsolationForest model and saves <code>Models/iforest_model.pkl</code>.</td>
-          </tr>
-          <tr>
-            <td><code>python main.py --step iforest-monitor</code></td>
-            <td>After an IForest model exists.</td>
-            <td>Scores non-Monday windows and writes <code>Models/iforest_alerts_output.csv</code>.</td>
           </tr>
         </tbody>
       </table>

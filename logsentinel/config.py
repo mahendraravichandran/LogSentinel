@@ -10,8 +10,6 @@ MODELS_DIR = BASE_DIR / "Models"
 MONDAY_WINDOWED_FILE = "windowed_cleaned_Monday-WorkingHours.pcap_ISCX.csv"
 BASELINE_PATH = MODELS_DIR / "baseline_model.json"
 ALERTS_OUTPUT_PATH = MODELS_DIR / "alerts_output.csv"
-IFOREST_MODEL_PATH = MODELS_DIR / "iforest_model.pkl"
-IFOREST_ALERTS_PATH = MODELS_DIR / "iforest_alerts_output.csv"
 
 WINDOW_SIZE = 10000
 

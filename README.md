@@ -9,7 +9,6 @@ LogSentinel is a Python pipeline that ingests CIC-IDS2017 flow CSVs, builds a ba
 - Baseline modeling from Monday (benign) traffic
 - Z-score scoring + anomaly index severity buckets
 - SOC-focused alert context: severity, pattern guess, confidence, trend, top indicators, blast radius, action hint
-- Optional IsolationForest detector for unsupervised anomaly scoring
 
 ## Repository Layout
 ```
@@ -64,23 +63,14 @@ python main.py --step preprocess   # Data/raw -> Data/processed
 python main.py --step window       # Data/processed -> Data/windowed
 python main.py --step baseline     # builds Models/baseline_model.json from Monday
 python main.py --step monitor      # scores Tue-Fri, writes Models/alerts_output.csv
-python main.py --step iforest      # trains IsolationForest on Monday, scores Tue-Fri
-python main.py --step iforest-train
-python main.py --step iforest-monitor
 ```
 Execution time is printed on exit.
-
-## IsolationForest Mode
-- Trains an IsolationForest on Monday windowed features (excluding `window_id`, `attack_ratio`).
-- Scoring uses the model's `decision_function`; higher is more normal. Alerts are raised for model anomalies (`-1` prediction) or high z-scored anomaly scores.
-- Outputs alerts to `Models/iforest_alerts_output.csv` with columns: file, window_id, severity, anomaly_score, z_score, iforest_prediction (-1 anomaly, 1 normal).
 
 ## Configuration (`logsentinel/config.py`)
 - `WINDOW_SIZE`: default `10000` flows per window
 - `ANOMALY_INDEX_THRESHOLDS`: LOW <3, MEDIUM 3-<6, HIGH 6-<10, CRITICAL >=10
 - Paths: `RAW_DIR`, `PROCESSED_DIR`, `WINDOWED_DIR`, `MODELS_DIR`
 - Monday reference file: `MONDAY_WINDOWED_FILE`
-- Model paths: `BASELINE_PATH`, `ALERTS_OUTPUT_PATH`, `IFOREST_MODEL_PATH`, `IFOREST_ALERTS_PATH`
 
 Change values in `config.py` and rerun the relevant stages.
 
@@ -89,7 +79,6 @@ Change values in `config.py` and rerun the relevant stages.
 - Windowed feature CSVs -> `Data/windowed/windowed_*.csv`
 - Baseline model -> `Models/baseline_model.json`
 - Alerts -> `Models/alerts_output.csv` (also printed to terminal)
-- IsolationForest outputs -> `Models/iforest_model.pkl`, `Models/iforest_alerts_output.csv`
 
 Example alert row (truncated):
 ```

@@ -1,5 +1,4 @@
 from .baseline import build_baseline
-from .isolation import run_iforest_monitor, train_iforest
 from .monitor import run_monitoring
 from .preprocessing import run_preprocessing
 from .windowing import run_windowing
@@ -22,19 +21,6 @@ def run_pipeline(step: str = "all") -> None:
 
     if step == "monitor":
         run_monitoring()
-        return
-
-    if step == "iforest-train":
-        train_iforest()
-        return
-
-    if step == "iforest-monitor":
-        run_iforest_monitor()
-        return
-
-    if step == "iforest":
-        train_iforest()
-        run_iforest_monitor()
         return
 
     if step == "all":
