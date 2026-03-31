@@ -412,21 +412,24 @@ Top 3 Indicators:
         <div>
           <h3>Current Limits</h3>
           <ul>
-            <li>Offline/batch only; no streaming ingestion.</li>
-            <li>Assumes Monday traffic is benign; drift can affect both detectors.</li>
-            <li>No enrichment (top talkers/ports/intel); alerts are behavior-only.</li>
-            <li>Static thresholds; no adaptive feedback loop.</li>
-            <li>IsolationForest retraining tied to Monday file and single saved model.</li>
+            <li><strong>Baseline Drift:</strong> Static Monday baseline can age as behavior changes.</li>
+            <li><strong>Slow Attack Evasion:</strong> Low-and-slow attacks may stay below statistical thresholds.</li>
+            <li><strong>Baseline Poisoning Risk:</strong> Gradual manipulation could shift the baseline and dull sensitivity.</li>
+            <li><strong>Limited Model Complexity:</strong> IsolationForest helps, but complex patterns may still be missed.</li>
+            <li><strong>Batch Processing Only:</strong> Works on CSV files, not real-time streams.</li>
+            <li><strong>Enterprise Gap:</strong> SIEMs rely on rules/signatures; behavioral layers are often limited/abstracted.</li>
           </ul>
         </div>
         <div>
           <h3>Future Ideas</h3>
           <ul>
-            <li>Streaming/incremental windowing.</li>
-            <li>Alert enrichment with top IPs/ports and intel context.</li>
-            <li>Adaptive thresholding and feedback-driven tuning.</li>
-            <li>Scheduled retraining/versioning for baseline and IsolationForest.</li>
-            <li>Lightweight CI/tests for data schema and scoring sanity checks.</li>
+            <li><strong>Adaptive Baseline:</strong> Continuously update to follow behavior drift.</li>
+            <li><strong>Real-Time Processing:</strong> Add streaming/ingest path beyond batch CSV.</li>
+            <li><strong>Advanced ML Models:</strong> Explore Autoencoders or LSTMs for richer patterns.</li>
+            <li><strong>Drift Detection:</strong> Detect stale baselines and trigger safe retraining.</li>
+            <li><strong>Explainability:</strong> Add feature importance to show why alerts fire.</li>
+            <li><strong>SIEM Integration:</strong> Integrate with Splunk/OpenSearch for production workflows.</li>
+            <li><strong>Improved Classification:</strong> Replace heuristic attack labels with ML-based classifiers.</li>
           </ul>
         </div>
       </div>
