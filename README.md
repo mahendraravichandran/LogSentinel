@@ -69,6 +69,19 @@ Execution time is printed on exit.
 
 Isolation Forest is trained automatically after baseline (uses Monday windowed data) and loaded during monitoring; no new CLI flags required.
 
+## Hybrid Detection Details
+- Training: IsolationForest fits on Monday windowed features (drops `window_id`, `attack_ratio`) and is saved to `Models/isolation_forest_model.pkl`.
+- Monitoring: IsolationForest predictions and scores run alongside Z-score alerts for each window.
+- Decision fusion:
+  - Z-score alert AND IsolationForest anomaly -> `Final Decision: CONFIRMED ANOMALY (High)`
+  - Only one triggers -> `Final Decision: SUSPICIOUS (Medium)`
+  - Neither triggers -> `Final Decision: NORMAL (Low)`
+- Alert output adds:
+  - `IsolationForest   : Normal | Anomaly`
+  - `IF Score          : <decision_function value>`
+  - `Final Decision    : <CONFIRMED / SUSPICIOUS / NORMAL>`
+- CSV columns: `iforest_prediction` (-1 anomaly, 1 normal), `iforest_score`, `final_decision`
+
 ## Configuration (`logsentinel/config.py`)
 - `WINDOW_SIZE`: default `10000` flows per window
 - `ANOMALY_INDEX_THRESHOLDS`: LOW <3, MEDIUM 3-<6, HIGH 6-<10, CRITICAL >=10
