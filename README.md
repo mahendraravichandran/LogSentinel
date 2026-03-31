@@ -1,6 +1,7 @@
 # LogSentinel: Behavioral Network Anomaly Monitoring
 
 LogSentinel is a Python pipeline that ingests CIC-IDS2017 flow CSVs, builds a baseline of normal traffic, and emits SOC-ready anomaly alerts. It is batch/offline by design for deterministic, reproducible analysis.
+<br>A lightweight, hybrid anomaly detection system designed to simulate SOC-style behavioral monitoring.
 
 ## Features
 - End-to-end pipeline from one entrypoint (`main.py`)
@@ -11,10 +12,14 @@ LogSentinel is a Python pipeline that ingests CIC-IDS2017 flow CSVs, builds a ba
 - SOC-focused alert context: severity, pattern guess, confidence, trend, top indicators, blast radius, action hint
 - Hybrid detection: Isolation Forest layer (trained on Monday) alongside Z-score
 
+## Why This Project
+Traditional detection systems rely heavily on rules and signatures, which struggle to detect unknown threats and generate high false positives.  
+LogSentinel introduces a hybrid behavioral approach that combines statistical and machine learning methods to improve detection accuracy while maintaining explainability.
+
 ## Why both Z-score and IsolationForest?
 - **Z-score**: fast, transparent, threshold-based; great for explainability and consistent SOC tuning.
 - **IsolationForest**: tree-based unsupervised model that catches nonlinear/interaction patterns the Z-score may miss.
-- **Fusion**: an alert is elevated to “CONFIRMED ANOMALY” only when both agree; single-sided triggers are marked “SUSPICIOUS” to reduce false positives while still surfacing weak signals.
+- **Fusion**: Alerts are elevated to “CONFIRMED ANOMALY” only when both Z-score and IsolationForest agree, reducing false positives while preserving detection sensitivity. Single-sided triggers are marked “SUSPICIOUS”.
 
 ## Repository Layout
 ```
@@ -36,10 +41,13 @@ LogSentinel is a Python pipeline that ingests CIC-IDS2017 flow CSVs, builds a ba
 `-- docs/                     # static site
 ```
 
+## Architecture (High-Level)
+Raw Data → Preprocessing → Windowing → Hybrid Detection (Z-score + IsolationForest) → Decision Engine → SOC Alerts
+
 ## Requirements
 - Python 3.10+
 - Pip
-- Dependencies: `pandas` (>=2.0), `numpy` (>=1.24)
+- Dependencies: `pandas` (>=2.0), `numpy` (>=1.24), `scikit-learn`, `joblib`
   ```bash
   python -m venv .venv
   .venv\Scripts\activate
@@ -129,6 +137,11 @@ trend=Up (prev: 7.23 -> current: 15.69)
 - CIC-IDS2017 CSVs are large (hundreds of MB). Ensure >8 GB RAM for smooth pandas reads.
 - Windowing is O(rows); window size 10k balances fidelity vs compute. Increase cautiously.
 - Baseline/monitoring reuse intermediate files; rerun only needed stages to save time.
+
+## Limitations (Summary)
+- Static baseline may drift over time
+- Slow attacks may evade detection
+- Batch-based processing (no real-time support)
 
 ## Limitations
 - Offline/batch only; no streaming ingestion.
