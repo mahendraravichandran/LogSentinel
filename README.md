@@ -1,4 +1,4 @@
-# LogSentinel: Behavioral Network Anomaly Monitoring
+# LogSentinel: Hybrid Network Anomaly Detection System
 
 LogSentinel is a Python pipeline that ingests CIC-IDS2017 flow CSVs, builds a baseline of normal traffic, and emits SOC-ready anomaly alerts. It is batch/offline by design for deterministic, reproducible analysis.
 <br>A lightweight, hybrid anomaly detection system designed to simulate SOC-style behavioral monitoring.
