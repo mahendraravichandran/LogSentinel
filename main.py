@@ -9,7 +9,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--step",
-        choices=["all", "preprocess", "window", "baseline", "monitor"],
+        choices=[
+            "all",
+            "preprocess",
+            "window",
+            "baseline",
+            "monitor",
+            "iforest",
+            "iforest-train",
+            "iforest-monitor",
+        ],
         default="all",
         help="Pipeline stage to execute (default: all).",
     )
