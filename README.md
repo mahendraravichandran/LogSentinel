@@ -1,165 +1,283 @@
-# LogSentinel: Hybrid Network Anomaly Detection System
+# LogSentinel
 
-LogSentinel is a Python pipeline that ingests CIC-IDS2017 flow CSVs, builds a baseline of normal traffic, and emits SOC-ready anomaly alerts. It is batch/offline by design for deterministic, reproducible analysis.
-<br>A lightweight, hybrid anomaly detection system designed to simulate SOC-style behavioral monitoring.
+LogSentinel is a hybrid network anomaly detection project built on CIC-IDS2017 flow CSV files.
+It uses:
 
-## Features
-- End-to-end pipeline from one entrypoint (`main.py`)
-- Encoding-tolerant CSV loading and schema validation
-- Window-level feature engineering (10,000-flow snapshots)
-- Baseline modeling from Monday (benign) traffic
-- Z-score scoring + anomaly index severity buckets
-- SOC-focused alert context: severity, pattern guess, confidence, trend, top indicators, blast radius, action hint
-- Hybrid detection: Isolation Forest layer (trained on Monday) alongside Z-score
+- statistical deviation detection (Z-score + anomaly index), and
+- machine learning detection (Isolation Forest)
 
-## Why This Project
-Traditional detection systems rely heavily on rules and signatures, which struggle to detect unknown threats and generate high false positives.  
-LogSentinel introduces a hybrid behavioral approach that combines statistical and machine learning methods to improve detection accuracy while maintaining explainability.
+The goal is to generate SOC-style, explainable alerts from batch network flow data.
 
-## Why both Z-score and IsolationForest?
-- **Z-score**: fast, transparent, threshold-based; great for explainability and consistent SOC tuning.
-- **IsolationForest**: tree-based unsupervised model that catches nonlinear/interaction patterns the Z-score may miss.
-- **Fusion**: Alerts are elevated to “CONFIRMED ANOMALY” only when both Z-score and IsolationForest agree, reducing false positives while preserving detection sensitivity. Single-sided triggers are marked “SUSPICIOUS”.
+## What this project does
 
-## Repository Layout
-```
+LogSentinel runs a full offline pipeline:
+
+1. Preprocess raw CSV files
+2. Convert traffic into fixed-size behavior windows
+3. Build a baseline from Monday traffic
+4. Train an Isolation Forest model on Monday windows
+5. Monitor Tuesday-Friday windows and generate alerts
+
+Each alert includes severity, likely attack pattern, top indicators, trend, and action hint.
+
+## Why this project exists
+
+Signature and rule-only detection often misses unknown behavior.
+LogSentinel adds behavioral detection by combining:
+
+- transparent statistical scoring (easy to explain/tune), and
+- unsupervised ML (captures non-linear patterns)
+
+This gives more context than a single method alone.
+
+## Core features
+
+- One entry point: `main.py`
+- Encoding-tolerant CSV loading (`utf-8`, then `cp1252`, then `latin1`)
+- Schema validation and numeric coercion
+- Window-level feature engineering (default: 10,000 flows/window)
+- Monday baseline model (`mean`/`std`)
+- Z-score alerting with severity buckets
+- Isolation Forest training + inference
+- Hybrid final decision field in alerts
+- SOC-friendly terminal alert output + CSV export
+
+## Repository structure
+
+```text
 .
-|-- main.py                   # CLI entrypoint
-|-- logsentinel/              # pipeline code
-|   |-- config.py             # paths, window size, thresholds, schema
-|   |-- preprocessing.py      # cleaning and numeric coercion
-|   |-- windowing.py          # 10k-flow windows + features
-|   |-- baseline.py           # baseline mean/std from Monday
-|   `-- monitor.py            # z-scores, severity, alerts CSV
+|-- main.py
+|-- requirements.txt
+|-- logsentinel/
+|   |-- __init__.py
+|   |-- config.py
+|   |-- preprocessing.py
+|   |-- windowing.py
+|   |-- baseline.py
+|   |-- isolation_forest_model.py
+|   |-- monitor.py
+|   `-- pipeline.py
 |-- Data/
-|   |-- raw/                  # input CSVs (CIC-IDS2017)
-|   |-- processed/            # cleaned CSVs (generated)
-|   `-- windowed/             # windowed CSVs (generated)
+|   |-- raw/          # input CIC-IDS2017 CSV files
+|   |-- processed/    # generated cleaned CSV files
+|   `-- windowed/     # generated window feature CSV files
 |-- Models/
-|   |-- baseline_model.json   # baseline stats (generated)
-|   `-- alerts_output.csv     # SOC alerts (generated)
-`-- docs/                     # static site
+|   |-- baseline_model.json         # generated baseline model
+|   |-- isolation_forest_model.pkl  # generated IF model
+|   `-- alerts_output.csv           # generated alerts
+`-- docs/              # static documentation website
 ```
-
-## Architecture (High-Level)
-Raw Data → Preprocessing → Windowing → Hybrid Detection (Z-score + IsolationForest) → Decision Engine → SOC Alerts
 
 ## Requirements
+
 - Python 3.10+
-- Pip
-- Dependencies: `pandas` (>=2.0), `numpy` (>=1.24), `scikit-learn`, `joblib`
-  ```bash
-  python -m venv .venv
-  .venv\Scripts\activate
-  pip install -r requirements.txt
-  ```
+- pip
 
-## Dataset Setup (CIC-IDS2017)
-1. Download the "MachineLearningCSV" archive from https://www.unb.ca/cic/datasets/ids-2017.html
-2. Extract all CSVs into `Data/raw/` so you have:
-   - `Monday-WorkingHours.pcap_ISCX.csv`
-   - `Tuesday-WorkingHours.pcap_ISCX.csv`
-   - `Wednesday-workingHours.pcap_ISCX.csv`
-   - `Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv`
-   - `Thursday-WorkingHours-Afternoon-Infilteration.pcap_ISCX.csv`
-   - `Friday-WorkingHours-Morning.pcap_ISCX.csv`
-   - `Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv`
-   - `Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv`
+Install dependencies:
 
-## Quick Start
-Run everything:
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+## Dataset setup (CIC-IDS2017)
+
+1. Download the `MachineLearningCSV` archive from:
+   https://www.unb.ca/cic/datasets/ids-2017.html
+2. Extract all CSV files into `Data/raw/`.
+3. Ensure these files exist:
+
+- `Monday-WorkingHours.pcap_ISCX.csv`
+- `Tuesday-WorkingHours.pcap_ISCX.csv`
+- `Wednesday-workingHours.pcap_ISCX.csv`
+- `Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv`
+- `Thursday-WorkingHours-Afternoon-Infilteration.pcap_ISCX.csv`
+- `Friday-WorkingHours-Morning.pcap_ISCX.csv`
+- `Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv`
+- `Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv`
+
+## How to run
+
+Run full pipeline:
+
 ```bash
 python main.py
 ```
-Run a specific stage:
+
+Run individual stages:
+
 ```bash
-python main.py --step preprocess   # Data/raw -> Data/processed
-python main.py --step window       # Data/processed -> Data/windowed
-python main.py --step baseline     # builds Models/baseline_model.json from Monday
-python main.py --step monitor      # scores Tue-Fri, writes Models/alerts_output.csv
-```
-Execution time is printed on exit.
-
-Isolation Forest is trained automatically after baseline (uses Monday windowed data) and loaded during monitoring; no new CLI flags required.
-
-## Hybrid Detection Details
-- Training: IsolationForest fits on Monday windowed features (drops `window_id`, `attack_ratio`) and is saved to `Models/isolation_forest_model.pkl`.
-- Monitoring: IsolationForest predictions and scores run alongside Z-score alerts for each window.
-- Decision fusion:
-  - Z-score alert AND IsolationForest anomaly -> `Final Decision: CONFIRMED ANOMALY (High)`
-  - Only one triggers -> `Final Decision: SUSPICIOUS (Medium)`
-  - Neither triggers -> `Final Decision: NORMAL (Low)`
-- Alert output adds:
-  - `IsolationForest   : Normal | Anomaly`
-  - `IF Score          : <decision_function value>`
-  - `Final Decision    : <CONFIRMED / SUSPICIOUS / NORMAL>`
-- CSV columns: `iforest_prediction` (-1 anomaly, 1 normal), `iforest_score`, `final_decision`
-
-## Configuration (`logsentinel/config.py`)
-- `WINDOW_SIZE`: default `10000` flows per window
-- `ANOMALY_INDEX_THRESHOLDS`: LOW <3, MEDIUM 3-<6, HIGH 6-<10, CRITICAL >=10
-- Paths: `RAW_DIR`, `PROCESSED_DIR`, `WINDOWED_DIR`, `MODELS_DIR`
-- Monday reference file: `MONDAY_WINDOWED_FILE`
-- Model paths: `BASELINE_PATH`, `ALERTS_OUTPUT_PATH`, `isolation_forest_model.pkl`
-
-Change values in `config.py` and rerun the relevant stages.
-
-## Outputs
-- Cleaned CSVs -> `Data/processed/cleaned_*.csv`
-- Windowed feature CSVs -> `Data/windowed/windowed_*.csv`
-- Baseline model -> `Models/baseline_model.json`
-- Alerts -> `Models/alerts_output.csv` (also printed to terminal) with extra columns: `iforest_prediction`, `iforest_score`, `final_decision`
-
-Example alert row (truncated):
-```
-file=windowed_cleaned_Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv
-window_id=2 severity=CRITICAL likely_pattern=Possible DDoS confidence=High
-anomaly_index=15.69 max_z_score=-5.85 top_indicators=unique_destination_ips:-5.85 || avg_flow_packets_per_sec:-3.13 || unique_destination_ports:-2.44
-trend=Up (prev: 7.23 -> current: 15.69)
+python main.py --step preprocess
+python main.py --step window
+python main.py --step baseline
+python main.py --step monitor
 ```
 
-## How Detection Works
-- Z-score per metric using the Monday baseline (mean/std); std guarded to 1.0 if zero.
-- Anomaly Index = sum(|z_i|) across metrics.
-- Alert triggers when:
-  - >=2 metrics have |z| >= 3, **or**
-  - any metric has |z| >= 5.
-- Severity from Anomaly Index using configured thresholds.
-- Pattern heuristic:
-  - PortScan: very low `unique_destination_ips` with high `unique_destination_ports`.
-  - DDoS: very low `unique_destination_ips` with high packet volume/rate deviation.
-  - Infiltration: drop in `unique_destination_ips` with spike in packet rate.
-  - Web Attack: high `unique_source_ips` with high packet rate.
-  - Else: Unknown (review indicators).
-- IsolationForest runs alongside Z-score; its Normal/Anomaly flag and score contribute to the fused final decision (Confirmed / Suspicious / Normal).
+## Pipeline stages in detail
 
-## Performance Notes
-- CIC-IDS2017 CSVs are large (hundreds of MB). Ensure >8 GB RAM for smooth pandas reads.
-- Windowing is O(rows); window size 10k balances fidelity vs compute. Increase cautiously.
-- Baseline/monitoring reuse intermediate files; rerun only needed stages to save time.
+### 1) Preprocessing (`logsentinel/preprocessing.py`)
 
-## Limitations (Summary)
-- Static baseline may drift over time
-- Slow attacks may evade detection
-- Batch-based processing (no real-time support)
+- Reads `Data/raw/*.csv`
+- Strips column whitespace
+- Validates required schema
+- Keeps required fields only
+- Converts numeric columns with coercion
+- Drops rows with invalid values
+- Writes cleaned files to `Data/processed/cleaned_*.csv`
 
-## Limitations
-- Offline/batch only; no streaming ingestion.
-- Assumes Monday traffic is benign and representative; drift can degrade both Z-score and IsolationForest.
-- No IP/port enrichment or threat intel context; alerts are behavior-only.
-- Static thresholds; no adaptive calibration or feedback loop.
-- IsolationForest retraining is tied to Monday data presence and not versioned beyond the saved pickle.
+### 2) Windowing (`logsentinel/windowing.py`)
+
+- Reads `Data/processed/*.csv`
+- Splits rows into fixed windows (`WINDOW_SIZE`, default `10000`)
+- Computes behavior features per window:
+  - `total_flows`
+  - `total_bytes`
+  - `total_packets`
+  - `unique_source_ips`
+  - `unique_destination_ips`
+  - `unique_destination_ports`
+  - `avg_flow_bytes_per_sec`
+  - `avg_flow_packets_per_sec`
+  - `avg_packets_per_flow`
+  - `attack_ratio`
+- Writes window files to `Data/windowed/windowed_*.csv`
+
+### 3) Baseline (`logsentinel/baseline.py`)
+
+- Uses Monday windowed file:
+  `Data/windowed/windowed_cleaned_Monday-WorkingHours.pcap_ISCX.csv`
+- Excludes `window_id` and `attack_ratio`
+- Computes `mean` and `std` for each feature
+- Saves baseline to `Models/baseline_model.json`
+
+### 4) Isolation Forest training (`logsentinel/isolation_forest_model.py`)
+
+- Runs after baseline stage in pipeline
+- Trains on Monday windowed features
+- Excludes `window_id` and `attack_ratio`
+- Model params:
+  - `n_estimators=100`
+  - `contamination=0.05`
+  - `random_state=42`
+- Saves model to `Models/isolation_forest_model.pkl`
+
+### 5) Monitoring (`logsentinel/monitor.py`)
+
+- Loads baseline and non-Monday windowed files
+- Computes per-window Z-scores per feature:
+  - `z = (value - mean) / std`
+- Computes anomaly index:
+  - `sum(abs(z_i))`
+- Triggers alert when:
+  - at least 2 metrics have `|z| >= 3`, or
+  - any metric has `|z| >= 5`
+- Classifies severity by anomaly index:
+  - `<3` -> `LOW`
+  - `3 to <6` -> `MEDIUM`
+  - `6 to <10` -> `HIGH`
+  - `>=10` -> `CRITICAL`
+- Runs Isolation Forest inference for each window
+- Emits SOC-style alert details to terminal
+- Writes alert rows to `Models/alerts_output.csv`
+
+## Hybrid decision logic
+
+For each alerted window:
+
+- Z-score trigger is active (alert condition met)
+- Isolation Forest gives prediction:
+  - `-1` = anomaly
+  - `1` = normal
+
+Final decision in output:
+
+- `CONFIRMED ANOMALY` when Z-score trigger and IF anomaly agree
+- `SUSPICIOUS` when only one side indicates anomaly
+
+## Pattern labeling heuristics
+
+The monitor adds a likely pattern label with confidence and action hint:
+
+- `Possible PortScan`
+- `Possible DDoS`
+- `Possible Infiltration`
+- `Possible Web Attack`
+- `Unknown`
+
+These are heuristic labels based on feature deviations, not supervised attack classification.
+
+## Output files
+
+- Cleaned data: `Data/processed/cleaned_*.csv`
+- Windowed features: `Data/windowed/windowed_*.csv`
+- Baseline model: `Models/baseline_model.json`
+- Isolation Forest model: `Models/isolation_forest_model.pkl`
+- Alerts: `Models/alerts_output.csv`
+
+Main alert CSV columns include:
+
+- `file`
+- `window_id`
+- `severity`
+- `likely_pattern`
+- `confidence`
+- `anomaly_index`
+- `max_z_score`
+- `top_indicators`
+- `trend`
+- `unique_source_ips`
+- `unique_destination_ips`
+- `unique_destination_ports`
+- `attack_ratio`
+- `soc_action_hint`
+- `iforest_prediction`
+- `iforest_score`
+- `final_decision`
+
+## Configuration
+
+Edit `logsentinel/config.py` to tune behavior:
+
+- `WINDOW_SIZE`
+- `ANOMALY_INDEX_THRESHOLDS`
+- `RAW_DIR`, `PROCESSED_DIR`, `WINDOWED_DIR`, `MODELS_DIR`
+- `MONDAY_WINDOWED_FILE`
+- `BASELINE_PATH`, `ALERTS_OUTPUT_PATH`
+
+After config changes:
+
+- window size change -> rerun `window`, `baseline`, `monitor`
+- threshold change -> rerun `monitor`
+- baseline source change -> rerun `baseline`, `monitor`
+
+## Practical notes
+
+- CIC-IDS2017 files are large; 8+ GB RAM recommended.
+- This is an offline batch pipeline (not real-time streaming).
+- Baseline quality depends on Monday traffic being representative.
 
 ## Troubleshooting
-- Missing required columns -> file is skipped in preprocessing; check column names exactly.
-- Baseline missing -> ensure `Data/windowed/windowed_cleaned_Monday-WorkingHours.pcap_ISCX.csv` exists, then rerun `--step baseline`.
-- Encoding errors -> preprocessing falls back from utf-8 to cp1252 to latin1 automatically.
-- Empty alerts -> verify non-Monday windowed files exist and baseline is present.
 
-## Roadmap Ideas
-- Add unit tests and CI workflow.
-- Dockerfile for reproducible runtime.
-- Streaming/online windowing option.
-- Configurable CLI flags for thresholds and window size.
-- Add enrichment (top talkers, ports) to alerts.
-- Automate retraining cadence for IsolationForest and baseline.
+- Missing required columns:
+  - file is skipped during preprocessing
+- Baseline missing:
+  - ensure Monday windowed file exists, then rerun `--step baseline`
+- Encoding issues:
+  - loader tries `utf-8`, then `cp1252`, then `latin1`
+- No alerts:
+  - check non-Monday windowed files and baseline presence
+- Isolation Forest missing at monitor time:
+  - rerun `--step baseline` to retrain IF model
+
+## Limitations
+
+- Static baseline can drift over time
+- Low-and-slow attacks may evade threshold detection
+- No live ingestion/stream processing
+- No external enrichment (threat intel, asset context)
+- Heuristic pattern naming is not ground-truth classification
+
+## License
+
+MIT License. See `LICENSE`.
