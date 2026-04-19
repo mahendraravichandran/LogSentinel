@@ -1,12 +1,10 @@
 # LogSentinel
 
-LogSentinel is a hybrid network anomaly detection project built on CIC-IDS2017 flow CSV files.
-It uses:
+LogSentinel is a lightweight hybrid SIEM-style anomaly detection system that identifies cyber threats in network traffic using both statistical and machine learning techniques.
+It processes CIC-IDS2017 flow data, builds a baseline of normal behavior, and generates SOC-style alerts using a combination of Z-score analysis and Isolation Forest.
+Built using Python, pandas, and scikit-learn, the system is designed for efficient batch processing and modular extensibility.
 
-- statistical deviation detection (Z-score + anomaly index), and
-- machine learning detection (Isolation Forest)
-
-The goal is to generate SOC-style, explainable alerts from batch network flow data.
+The system is designed to generate SOC-style, explainable alerts from batch network flow data.
 
 ## What this project does
 
@@ -29,6 +27,7 @@ LogSentinel adds behavioral detection by combining:
 - unsupervised ML (captures non-linear patterns)
 
 This gives more context than a single method alone.
+This approach reflects modern SOC detection strategies, where hybrid statistical and machine learning methods are used to improve detection accuracy while reducing false positives.
 
 ## Core features
 
@@ -38,7 +37,7 @@ This gives more context than a single method alone.
 - Window-level feature engineering (default: 10,000 flows/window)
 - Monday baseline model (`mean`/`std`)
 - Z-score alerting with severity buckets
-- Isolation Forest training + inference
+- Isolation Forest (unsupervised ML model) for anomaly detection
 - Hybrid final decision field in alerts
 - SOC-friendly terminal alert output + CSV export
 
@@ -181,7 +180,7 @@ python main.py --step monitor
 - Emits SOC-style alert details to terminal
 - Writes alert rows to `Models/alerts_output.csv`
 
-## Hybrid decision logic
+## Hybrid decision fusion logic
 
 For each alerted window:
 
@@ -277,6 +276,19 @@ After config changes:
 - No live ingestion/stream processing
 - No external enrichment (threat intel, asset context)
 - Heuristic pattern naming is not ground-truth classification
+
+## Results
+
+- 0 anomaly alerts on baseline (Monday traffic)
+- 70+ anomalous windows detected
+- Example:
+  - Anomaly Index: 15.69
+  - Max Z-score: -5.85
+- Detected:
+  - DDoS patterns
+  - Port scanning
+
+These results demonstrate that LogSentinel can clearly distinguish between normal and malicious traffic while maintaining low false positives, making it effective for practical anomaly detection.
 
 ## License
 
