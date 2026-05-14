@@ -25,34 +25,38 @@ def build_baseline() -> None:
     columns_to_exclude = ["window_id", "attack_ratio"]
     feature_columns = [col for col in df.columns if col not in columns_to_exclude]
 
-    baseline_model = {}
+    baseline = {}
 
     print("\nComputing baseline statistics...\n")
 
     for col in feature_columns:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-        clean_series = df[col].replace([np.inf, -np.inf], np.nan).dropna()
-
-        if len(clean_series) == 0:
-            mean = 0.0
-            std = 1.0
-        else:
-            mean = float(clean_series.mean())
-            std = float(clean_series.std())
-            if std == 0:
-                std = 1.0
-
-        baseline_model[col] = {"mean": mean, "std": std}
+        mean, std = _mean_and_std(df[col])
+        baseline[col] = {"mean": mean, "std": std}
 
         print(f"{col}")
         print(f"   Mean: {round(mean, 4)}")
         print(f"   Std : {round(std, 4)}\n")
 
-    print(f"[INFO] Feature extraction completed for baseline model.")
+    print("[INFO] Feature extraction completed for baseline model.")
 
     BASELINE_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(BASELINE_PATH, "w", encoding="utf-8") as file:
-        json.dump(baseline_model, file, indent=4)
+        json.dump(baseline, file, indent=4)
 
     print(f"Baseline model saved to: {BASELINE_PATH}")
     print("\nBaseline training completed successfully.")
+
+
+def _mean_and_std(values: pd.Series) -> tuple[float, float]:
+    series = pd.to_numeric(values, errors="coerce")
+    series = series.replace([np.inf, -np.inf], np.nan).dropna()
+
+    if series.empty:
+        return 0.0, 1.0
+
+    mean = float(series.mean())
+    std = float(np.std(series))
+    if std == 0:
+        std = 1.0
+
+    return mean, std

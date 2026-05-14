@@ -6,7 +6,7 @@
   <title>LogSentinel: Hybrid Network Anomaly Detection System</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -207,7 +207,7 @@ Top 3 Indicators:
       <ul>
         <li><strong>Z-score</strong>: fast, transparent thresholds; great for explainability and tuning.</li>
         <li><strong>IsolationForest</strong>: tree-based, captures nonlinear/interaction patterns.</li>
-        <li><strong>Fusion</strong>: both agree → CONFIRMED ANOMALY; only one fires → SUSPICIOUS; neither → NORMAL. Reduces false positives while still surfacing weak signals.</li>
+        <li><strong>Fusion</strong>: both agree &rarr; CONFIRMED ANOMALY; only one fires &rarr; SUSPICIOUS; neither &rarr; NORMAL. Reduces false positives while still surfacing weak signals.</li>
       </ul>
     </section>
 
@@ -365,7 +365,7 @@ Top 3 Indicators:
           <tr>
             <td><code>pip install -r requirements.txt</code></td>
             <td>First project setup or on a new machine.</td>
-            <td>Installs required Python libraries (`pandas`, `numpy`).</td>
+            <td>Installs required Python libraries: <code>pandas</code> and <code>numpy</code>.</td>
           </tr>
           <tr>
             <td><code>python main.py</code></td>
@@ -402,12 +402,12 @@ Top 3 Indicators:
       <ul>
         <li>CIC-IDS2017 CSVs are large (hundreds of MB); prefer machines with &gt;8 GB RAM.</li>
         <li>Windowing is O(rows); 10k-flow windows balance fidelity and compute. Increase cautiously.</li>
-        <li>Baseline and monitor reuse intermediates—rerun only the needed stages to save time.</li>
+        <li>Baseline and monitor reuse intermediates&mdash;rerun only the needed stages to save time.</li>
       </ul>
     </section>
 
     <section id="limits" class="card reveal">
-      <h2>Limitations & Future Ideas</h2>
+      <h2>Limitations &amp; Future Ideas</h2>
       <div class="grid-2">
         <div>
           <h3>Current Limits</h3>

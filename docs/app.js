@@ -1,18 +1,20 @@
 function attachCopyHandlers() {
-  const targets = document.querySelectorAll("[data-copy]");
+  const buttons = document.querySelectorAll("[data-copy]");
 
-  targets.forEach((el) => {
-    el.addEventListener("click", async () => {
-      const text = el.getAttribute("data-copy") || "";
-      const original = el.textContent;
+  buttons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      const text = button.getAttribute("data-copy") || "";
+      const originalText = button.textContent;
+
       try {
         await navigator.clipboard.writeText(text);
-        el.textContent = "Copied";
+        button.textContent = "Copied";
       } catch {
-        el.textContent = "Copy failed";
+        button.textContent = "Copy failed";
       }
+
       setTimeout(() => {
-        el.textContent = original;
+        button.textContent = originalText;
       }, 1100);
     });
   });
@@ -40,8 +42,8 @@ function attachRevealAnimation() {
 }
 
 function attachScrollProgress() {
-  const progress = document.getElementById("scroll-progress");
-  if (!progress) {
+  const bar = document.getElementById("scroll-progress");
+  if (!bar) {
     return;
   }
 
@@ -49,7 +51,7 @@ function attachScrollProgress() {
     const scrollTop = window.scrollY;
     const docHeight = document.documentElement.scrollHeight - window.innerHeight;
     const ratio = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
-    progress.style.width = `${Math.min(100, Math.max(0, ratio))}%`;
+    bar.style.width = `${Math.min(100, Math.max(0, ratio))}%`;
   };
 
   window.addEventListener("scroll", update, { passive: true });

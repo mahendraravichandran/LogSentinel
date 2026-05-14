@@ -17,15 +17,15 @@ def convert_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def read_csv_safely(file_path: Path) -> pd.DataFrame:
-    try:
-        return pd.read_csv(file_path, encoding="utf-8", low_memory=False)
-    except UnicodeDecodeError:
-        print("UTF-8 failed. Trying cp1252 encoding...")
+    encodings = ["utf-8", "cp1252", "latin1"]
+
+    for encoding in encodings:
         try:
-            return pd.read_csv(file_path, encoding="cp1252", low_memory=False)
+            return pd.read_csv(file_path, encoding=encoding, low_memory=False)
         except UnicodeDecodeError:
-            print("cp1252 failed. Trying latin1 encoding...")
-            return pd.read_csv(file_path, encoding="latin1", low_memory=False)
+            print(f"{encoding} failed. Trying next encoding...")
+
+    raise UnicodeDecodeError("csv", b"", 0, 1, "Unable to read with known encodings")
 
 
 def preprocess_file(file_path: Path, output_path: Path) -> None:
@@ -41,8 +41,7 @@ def preprocess_file(file_path: Path, output_path: Path) -> None:
             print(f"Skipping file - missing columns: {missing}")
             return
 
-        df = df[REQUIRED_COLUMNS]
-        df = convert_numeric_columns(df)
+        df = convert_numeric_columns(df[REQUIRED_COLUMNS].copy())
         df = df.dropna()
         print(f"[INFO] Rows processed (after cleaning): {len(df)}")
 

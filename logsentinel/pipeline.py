@@ -1,50 +1,63 @@
 from .baseline import build_baseline
+from .config import WINDOWED_DIR, MONDAY_WINDOWED_FILE
+from .isolation_forest_model import train_isolation_forest
 from .monitor import run_monitoring
 from .preprocessing import run_preprocessing
 from .windowing import run_windowing
-from .isolation_forest_model import train_isolation_forest
-from .config import WINDOWED_DIR, MONDAY_WINDOWED_FILE
+
+
+def _log_stage(stage: str) -> None:
+    print(f"[PIPELINE] Running stage: {stage}")
 
 
 def run_pipeline(step: str = "all") -> None:
     step = step.lower()
 
-    if step == "preprocess":
-        run_preprocessing()
-        return
-
-    if step == "window":
-        run_windowing()
-        return
-
-    if step == "baseline":
-        build_baseline()
-        _maybe_train_iforest()
-        return
-
-    if step == "monitor":
-        run_monitoring()
-        return
+    steps = {
+        "preprocess": _run_preprocess,
+        "window": _run_windowing,
+        "baseline": _run_baseline,
+        "monitor": _run_monitoring,
+    }
 
     if step == "all":
-        run_preprocessing()
-        run_windowing()
-        build_baseline()
-        _maybe_train_iforest()
-        run_monitoring()
-        return
+        for stage in steps.values():
+            stage()
+    elif step in steps:
+        steps[step]()
+    else:
+        raise ValueError(f"Unsupported step: {step}")
 
-    raise ValueError(f"Unsupported step: {step}")
+
+def _run_preprocess() -> None:
+    _log_stage("preprocess")
+    run_preprocessing()
+
+
+def _run_windowing() -> None:
+    _log_stage("window")
+    run_windowing()
+
+
+def _run_baseline() -> None:
+    _log_stage("baseline")
+    build_baseline()
+    _maybe_train_iforest()
+
+
+def _run_monitoring() -> None:
+    _log_stage("monitor")
+    run_monitoring()
 
 
 def _maybe_train_iforest() -> None:
-    """Train IsolationForest on Monday windowed data if available."""
     monday_path = WINDOWED_DIR / MONDAY_WINDOWED_FILE
     if not monday_path.exists():
         print(f"[IFOREST] Skipping training; missing {monday_path}")
         return
     try:
         import pandas as pd
+
         df = pd.read_csv(monday_path)
         train_isolation_forest(df)
     except Exception as exc:

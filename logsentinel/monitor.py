@@ -14,7 +14,11 @@ Z_MEDIUM = 3
 Z_HIGH = 5
 
 
-def load_baseline():
+def is_alert(deviating_metrics: list[str], max_z: float) -> bool:
+    return len(deviating_metrics) >= 2 or abs(max_z) >= Z_HIGH
+
+
+def load_baseline() -> dict[str, dict[str, float]] | None:
     try:
         with open(BASELINE_PATH, "r", encoding="utf-8") as file:
             data = json.load(file)
@@ -25,7 +29,7 @@ def load_baseline():
         return None
 
 
-def compute_z(value, mean, std):
+def compute_z(value: float, mean: float, std: float) -> float:
     if pd.isna(value) or std == 0:
         return 0
     return (value - mean) / std
@@ -45,7 +49,10 @@ def classify_severity(anomaly_index: float, thresholds: dict) -> str:
     return "CRITICAL"
 
 
-def top_indicators(metric_z_scores: dict, limit: int = 3) -> list:
+def top_indicators(
+    metric_z_scores: dict[str, float],
+    limit: int = 3,
+) -> list[tuple[str, float]]:
     ranked = sorted(
         metric_z_scores.items(),
         key=lambda item: abs(item[1]),
@@ -65,6 +72,24 @@ def anomaly_trend(previous_index: float | None, current_index: float) -> str:
     return f"Down (prev: {previous_index:.2f} -> current: {current_index:.2f})"
 
 
+def iforest_label(prediction) -> str:
+    if prediction is None:
+        return "N/A"
+    if prediction == -1:
+        return "Anomaly"
+    return "Normal"
+
+
+def final_decision(z_trigger: bool, iforest_prediction) -> tuple[str, str]:
+    if_trigger = iforest_prediction == -1 if iforest_prediction is not None else False
+
+    if z_trigger and if_trigger:
+        return "CONFIRMED ANOMALY", "High"
+    if z_trigger or if_trigger:
+        return "SUSPICIOUS", "Medium"
+    return "NORMAL", "Low"
+
+
 def infer_pattern(metric_z_scores: dict) -> tuple[str, str, str]:
     z_unique_dst_ips = metric_z_scores.get("unique_destination_ips", 0.0)
     z_unique_dst_ports = metric_z_scores.get("unique_destination_ports", 0.0)
@@ -72,7 +97,6 @@ def infer_pattern(metric_z_scores: dict) -> tuple[str, str, str]:
     z_total_packets = metric_z_scores.get("total_packets", 0.0)
     z_unique_src_ips = metric_z_scores.get("unique_source_ips", 0.0)
 
-    # PortScan signal: sharp drop in destination IP diversity and elevated destination ports.
     if z_unique_dst_ips <= -5 and z_unique_dst_ports >= 2:
         return (
             "Possible PortScan",
@@ -80,7 +104,6 @@ def infer_pattern(metric_z_scores: dict) -> tuple[str, str, str]:
             "Investigate top source IPs for horizontal scan behavior and block repeated probes.",
         )
 
-    # DDoS signal: strong destination concentration with packet-rate/volume anomalies.
     if z_unique_dst_ips <= -5 and (z_packets_rate <= -3 or abs(z_total_packets) >= 3):
         return (
             "Possible DDoS",
@@ -88,7 +111,6 @@ def infer_pattern(metric_z_scores: dict) -> tuple[str, str, str]:
             "Validate volumetric flood on constrained targets; apply rate-limit and upstream filtering.",
         )
 
-    # Infiltration-like signal: destination diversity drops while packet rate rises.
     if z_unique_dst_ips <= -3 and z_packets_rate >= 4:
         return (
             "Possible Infiltration",
@@ -96,7 +118,6 @@ def infer_pattern(metric_z_scores: dict) -> tuple[str, str, str]:
             "Correlate destination hosts with endpoint telemetry and unusual outbound sessions.",
         )
 
-    # Web attack-like signal: source diversity grows with increased packet rate.
     if z_unique_src_ips >= 3 and z_packets_rate >= 3:
         return (
             "Possible Web Attack",
@@ -109,6 +130,10 @@ def infer_pattern(metric_z_scores: dict) -> tuple[str, str, str]:
         "Low",
         "Review top deviating metrics and correlate with firewall, DNS, and endpoint logs.",
     )
+
+
+def _safe_index(values, idx: int):
+    return values.iloc[idx] if hasattr(values, "iloc") else values[idx]
 
 
 def print_alert(
@@ -196,9 +221,12 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
             print(f"[INFO] Loaded windowed dataset: {file_path} (windows: {len(df)})")
             previous_anomaly_index = None
 
-            # Pre-compute IsolationForest predictions if model available
             if iforest_model is not None:
-                if_preds, if_scores = predict_isolation_forest(df, iforest_model)
+                try:
+                    if_preds, if_scores = predict_isolation_forest(df, iforest_model)
+                except Exception as exc:
+                    print(f"[IFOREST] Inference skipped for {file_path.name}: {exc}")
+                    if_preds, if_scores = None, None
             else:
                 if_preds, if_scores = None, None
 
@@ -233,7 +261,7 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
                 top_three = top_indicators(metric_z_scores, limit=3)
                 likely_pattern, confidence, action_hint = infer_pattern(metric_z_scores)
 
-                if len(deviating_metrics) >= 2 or abs(max_z) >= Z_HIGH:
+                if is_alert(deviating_metrics, max_z):
                     severity = classify_severity(
                         anomaly_index,
                         ANOMALY_INDEX_THRESHOLDS,
@@ -241,30 +269,13 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
                     total_alerts += 1
                     file_alert_counts[file_path.name] += 1
 
-                    # IsolationForest inference for this window
-                    if_pred = if_preds[idx] if if_preds is not None else None
-                    if_score = float(if_scores[idx]) if if_scores is not None else None
-                    if_flag = (
-                        "Anomaly" if if_pred == -1 else "Normal"
-                        if if_pred is not None
-                        else "N/A"
+                    if_pred = _safe_index(if_preds, idx) if if_preds is not None else None
+                    if_score = (
+                        float(_safe_index(if_scores, idx)) if if_scores is not None else None
                     )
+                    z_trigger = is_alert(deviating_metrics, max_z)
+                    decision, decision_confidence = final_decision(z_trigger, if_pred)
 
-                    # Hybrid decision
-                    z_trigger = True
-                    if_trigger = if_pred == -1 if if_pred is not None else False
-
-                    if z_trigger and if_trigger:
-                        final_decision = "CONFIRMED ANOMALY"
-                        final_confidence = "High"
-                    elif z_trigger or if_trigger:
-                        final_decision = "SUSPICIOUS"
-                        final_confidence = "Medium"
-                    else:
-                        final_decision = "NORMAL"
-                        final_confidence = "Low"
-
-                    # Keep existing confidence but augment final decision context
                     print_alert(
                         file_path.name,
                         window_id,
@@ -280,10 +291,10 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
                         int(row.get("unique_destination_ips", 0)),
                         int(row.get("unique_destination_ports", 0)),
                         row.get("attack_ratio", float("nan")),
-                        if_flag,
+                        iforest_label(if_pred),
                         if_score,
-                        final_decision,
-                        final_confidence,
+                        decision,
+                        decision_confidence,
                     )
 
                     alert_rows.append(
@@ -312,7 +323,7 @@ def run_monitoring(save_alerts: bool = True) -> pd.DataFrame:
                             "soc_action_hint": action_hint,
                             "iforest_prediction": if_pred,
                             "iforest_score": if_score,
-                            "final_decision": final_decision,
+                            "final_decision": decision,
                         }
                     )
         except Exception as exc:

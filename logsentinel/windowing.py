@@ -6,9 +6,7 @@ from .config import PROCESSED_DIR, WINDOW_SIZE, WINDOWED_DIR
 
 def create_windows(df: pd.DataFrame) -> pd.DataFrame:
     windows = []
-
-    total_rows = len(df)
-    num_windows = total_rows // WINDOW_SIZE
+    num_windows = len(df) // WINDOW_SIZE
 
     for i in range(num_windows):
         start = i * WINDOW_SIZE
@@ -36,9 +34,8 @@ def create_windows(df: pd.DataFrame) -> pd.DataFrame:
         avg_flow_packets_per_sec = window_df["Flow Packets/s"].mean()
         avg_packets_per_flow = total_packets / total_flows if total_flows > 0 else 0
 
-        attack_ratio = (
-            window_df["Label"].apply(lambda x: 0 if "BENIGN" in str(x).upper() else 1).mean()
-        )
+        labels = window_df["Label"].astype(str).str.upper()
+        attack_ratio = (~labels.str.contains("BENIGN", na=False)).mean()
 
         windows.append(
             {

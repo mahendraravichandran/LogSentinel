@@ -13,12 +13,7 @@ ALERTS_OUTPUT_PATH = MODELS_DIR / "alerts_output.csv"
 
 WINDOW_SIZE = 10000
 
-# Severity thresholds based on anomaly index (sum of absolute Z-scores).
-# Buckets:
-#   anomaly_index < LOW       -> LOW
-#   LOW <= anomaly_index < MEDIUM -> MEDIUM
-#   MEDIUM <= anomaly_index < HIGH -> HIGH
-#   anomaly_index >= HIGH     -> CRITICAL
+# Severity is based on the anomaly index, which is the sum of absolute z-scores.
 ANOMALY_INDEX_THRESHOLDS = {
     "LOW": 3.0,
     "MEDIUM": 6.0,
